@@ -1,4 +1,7 @@
--- module Sudivide where
+module Subdivide
+    ( getLevels
+    , isPow2
+    ) where
 
 import Data.Bits ((.&.), shift)
 
@@ -54,12 +57,19 @@ chunks (mx, my) w
       | y <- [0..count (my-w) w]
       , x <- [0..count (mx-w) w]]
 
+bestPow2 :: Int -> Int
+bestPow2 n = last $ takeWhile (<= n) $ map (2^) [0..]
+
 forest :: Coord -> Int -> Tree
 forest m@(mx, my) w
     | mx < 0 || my < 0 = error "dimensions must be positive"
+    | mx < 2 || my < 2 = error "dimensions must be >2"
+    | mx < 2 || my < 2 = error "dimensions must be >2"
     | not (isPow2 w) = error ("w must be a power of 2 (value=" ++ show w ++ ")")
     | otherwise = Node Blank xs
-    where xs = map (tree m) (chunks m w)
+    where xs = map (tree m) (chunks m w')
+          w' | w > maximum m = bestPow2 w
+             | otherwise = w
 
 levels :: Tree -> [[Square]]
 levels (Node Blank bs) = [] : levels' bs
@@ -89,8 +99,8 @@ getLevels m n = levels $ forest m n
 
 main :: IO ()
 main = do
-    let m = (5, 5)
-    let w = 4
+    let m = (4, 4)
+    let w = 128
     let nPoints = uncurry (*) m
     let r = forest m w
     let c = chunks m w
