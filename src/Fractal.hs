@@ -119,32 +119,31 @@ colorT inSet
     | inSet = (1, 1, 1)
     | otherwise = (0, 0, 0)
 
-ps :: [Square]
-ps = concat $ getLevels (mx, my) 128
-
-ss :: [(Square, ColorT)]
-ss = zip ps ms
-    where ms = map fn ps `using` parListChunk (my `div` 8) rseq
+calcSquares :: [Square] -> [(Square, ColorT)]
+calcSquares ss = zip ss ms
+    where ms = map fn ss `using` parListChunk (my `div` 8) rseq
           fn = colorT . isInSet . fst
 
-vert' :: (GLfloat, GLfloat) -> IO ()
-vert' (x, y) = vertex $ Vertex3 x y 0
+drawVertex :: (GLfloat, GLfloat) -> IO ()
+drawVertex (x, y) = vertex $ Vertex3 x y 0
 
-vert :: (Square, ColorT) -> IO ()
-vert (((x, y), w), (r, g, b)) = do
+drawSquare :: (Square, ColorT) -> IO ()
+drawSquare (((x, y), w), (r, g, b)) = do
     let (x', y', w') = ( toScreen x mx
                        , toScreen y my
                        , fromIntegral w * toScreen ((mx`div`2)+1) mx)
     color $ Color3 r g b
-    mapM_ vert' [(x',    y'),
-                 (x'+w', y'),
-                 (x'+w', y'+w'),
-                 (x',    y'+w')]
+    mapM_ drawVertex [(x',    y'),
+                      (x'+w', y'),
+                      (x'+w', y'+w'),
+                      (x',    y'+w')]
 
+drawSquares :: [Square] -> IO ()
+drawSquares = renderPrimitive Quads . mapM_ drawSquare . calcSquares
 
 display :: DisplayCallback
 display = do
     clear [ColorBuffer]
-    renderPrimitive Quads $
-        mapM_ vert ss
+    let ss = getLevels (mx, my) 128
+    mapM_ drawSquares ss
     flush
