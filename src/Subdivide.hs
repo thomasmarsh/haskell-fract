@@ -95,7 +95,7 @@ printTree n (Node (Visible z) xs) = printElem n (show z) xs
 printTree n (Node Blank xs) = printElem n "<blank>" xs
 
 getLevels :: Coord -> Int -> [[Square]]
-getLevels m n = levels $ forest m n
+getLevels m n = filter (not . null) $ levels $ forest m n
 
 main :: IO ()
 main = do

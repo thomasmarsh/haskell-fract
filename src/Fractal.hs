@@ -3,9 +3,22 @@ module Fractal
     ) where
 
 import Complex
+    ( Complex
+    , complex
+    , im
+    , real
+    , mag2
+    , magnitude
+    )
+
+import Subdivide (getLevels)
+
 import Control.Parallel.Strategies
 import Data.Colour.RGBSpace.HSV
 import Graphics.UI.GLUT
+
+type ColorT = (GLfloat, GLfloat, GLfloat)
+type Square = ((Int, Int), Int)
 
 data Preset
     = Top
@@ -90,20 +103,6 @@ calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} mx my x y =
 calcZ' :: Int -> Int -> Complex
 calcZ' = calcZ view mx my
 
-points =
-    [ (toScreen x mx, toScreen y my, 0 :: GLfloat)
-    | x <- [0 .. mx]
-    , y <- [0 .. my]
-    , distance maxIter (calcZ' x y) > vcutoff view
-    ]
-
-points' =
-    concat
-        ([ [ (toScreen x mx, toScreen y my, 0 :: GLfloat)
-           | y <- [0 .. my]
-           , distance maxIter (calcZ' x y) > vcutoff view]
-         | x <- [0 .. mx]] `using` parListChunk (my `div` 8) rseq)
-
 fractMain :: IO ()
 fractMain = do
     (_progName, _args) <- getArgsAndInitialize
@@ -112,14 +111,40 @@ fractMain = do
     displayCallback $= display
     mainLoop
 
+isInSet :: (Int, Int) -> Bool
+isInSet (x, y) = distance maxIter (calcZ' x y) > vcutoff view
+
+colorT :: Bool -> ColorT
+colorT inSet
+    | inSet = (1, 1, 1)
+    | otherwise = (0, 0, 0)
+
+ps :: [Square]
+ps = concat $ getLevels (mx, my) 128
+
+ss :: [(Square, ColorT)]
+ss = zip ps ms
+    where ms = map fn ps `using` parListChunk (my `div` 8) rseq
+          fn = colorT . isInSet . fst
+
+vert' :: (GLfloat, GLfloat) -> IO ()
+vert' (x, y) = vertex $ Vertex3 x y 0
+
+vert :: (Square, ColorT) -> IO ()
+vert (((x, y), w), (r, g, b)) = do
+    let (x', y', w') = ( toScreen x mx
+                       , toScreen y my
+                       , fromIntegral w * toScreen ((mx`div`2)+1) mx)
+    color $ Color3 r g b
+    mapM_ vert' [(x',    y'),
+                 (x'+w', y'),
+                 (x'+w', y'+w'),
+                 (x',    y'+w')]
+
+
 display :: DisplayCallback
 display = do
     clear [ColorBuffer]
-    renderPrimitive Points $
-        mapM_
-            (\((x, y, z), c) -> do
-                 let c' = fromIntegral (c `mod` 256) / 256
-                 currentColor $= Color4 c' (1 - c') ((c' + 1) / 2) 1
-                 vertex $ Vertex3 x y z)
-            (zip points' [0 ..])
+    renderPrimitive Quads $
+        mapM_ vert ss
     flush
