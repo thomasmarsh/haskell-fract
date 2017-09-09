@@ -1,6 +1,6 @@
 module Main where
 
-import Fractal (fractMain)
+import Fract.Fractal (fractMain)
 
 main :: IO ()
 main = fractMain

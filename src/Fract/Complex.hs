@@ -1,4 +1,4 @@
-module Complex
+module Fract.Complex
     ( Complex(..)
     , real
     , im
@@ -7,7 +7,6 @@ module Complex
     ) where
 
 data Complex = C {-# UNPACK #-} !Double {-# UNPACK #-} !Double
--- data Complex = C Double Double
     deriving (Eq, Show)
 
 instance Num Complex where

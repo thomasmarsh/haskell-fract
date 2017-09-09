@@ -1,6 +1,7 @@
-module Subdivide
+module Fract.Subdivide
     ( getLevels
     , isPow2
+    , test
     ) where
 
 import Data.Bits ((.&.), shift)
@@ -43,10 +44,11 @@ subdivide m ((x, y), w)
           visible xs z = Node (Visible z) xs
 
 tree :: Coord -> Square -> Tree
-tree m z@((x, y), w)
+tree m z@((_, _), w)
     | w < 2 = error "cannot subdivide width less than 2"
     | otherwise = Node (Visible z) (subdivide m z)
 
+count :: Int -> Int -> Int
 count m w
     | (m `rem` w) == 0 = m `div` w
     | otherwise = (m `div` w)+1
@@ -58,7 +60,7 @@ chunks (mx, my) w
       , x <- [0..count (mx-w) w]]
 
 bestPow2 :: Int -> Int
-bestPow2 n = last $ takeWhile (<= n) $ map (2^) [0..]
+bestPow2 n = last $ takeWhile (<= n) $ map (2^) [(0::Int)..]
 
 forest :: Coord -> Int -> Tree
 forest m@(mx, my) w
@@ -78,8 +80,9 @@ levels (Node (Visible a) bs) = [a] : levels' bs
 levels' :: [Tree] -> [[Square]]
 levels' = foldr (zipWith' (++) . levels) []
 
-zipWith' f xs [] = xs
-zipWith' f [] xs = xs
+zipWith' :: (a -> a -> a) -> [a] -> [a] -> [a]
+zipWith' _ xs [] = xs
+zipWith' _ [] xs = xs
 zipWith' f (x:xs) (y:ys) = f x y : zipWith' f xs ys
 
 squares :: Tree -> [Square]
@@ -97,8 +100,8 @@ printTree n (Node Blank xs) = printElem n "<blank>" xs
 getLevels :: Coord -> Int -> [[Square]]
 getLevels m n = filter (not . null) $ levels $ forest m n
 
-main :: IO ()
-main = do
+test :: IO ()
+test = do
     let m = (4, 4)
     let w = 128
     let nPoints = uncurry (*) m
