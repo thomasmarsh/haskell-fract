@@ -3,8 +3,7 @@ module Fractal
     ) where
 
 import Complex
-    ( Complex
-    , complex
+    ( Complex (C)
     , im
     , real
     , mag2
@@ -34,7 +33,7 @@ calc z c maxIter = go 0 z 0
         | otherwise = go (i + 1) (z * z + c) dz'
       where
         nz = mag2 z
-        dz' = complex 2 0 * z * dz + complex 1 0
+        dz' = (C 2.0 0.0) * z * dz + (C 1.0 0.0)
         de = nz * log nz / magnitude dz
 
 bailout :: Complex -> Bool
@@ -93,7 +92,7 @@ toScreen n m = fromIntegral n / (fromIntegral m * 0.5) - 1.0
 
 calcZ :: View -> Int -> Int -> Int -> Int -> Complex
 calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} mx my x y =
-    complex (go px ox mx x) (go py oy my y)
+    C (go px ox mx x) (go py oy my y)
   where
     go p o m n = i + s * fromIntegral n
       where
