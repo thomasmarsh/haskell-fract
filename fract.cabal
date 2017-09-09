@@ -16,6 +16,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Fract.Complex
+                     , Fract.Draw
                      , Fract.Fractal
                      , Fract.Subdivide
   build-depends:       base >= 4.7 && < 5

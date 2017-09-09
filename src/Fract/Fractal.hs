@@ -1,23 +1,16 @@
 module Fract.Fractal
-    ( fractMain
+    ( calcSquares
     ) where
 
-import           Control.Concurrent          (threadDelay)
-import           Control.Monad               (when)
-import           Control.Parallel.Strategies (parListChunk, rseq, using)
-import           System.Exit                 (exitFailure, exitSuccess)
-import           System.IO                   (hPutStrLn, stderr)
-import qualified Graphics.Rendering.OpenGL   as GL
-import qualified Graphics.UI.GLFW            as GLFW
+import Control.Parallel.Strategies (parListChunk, rseq, using)
 
-import           Fract.Complex               (Complex (C)
-                                             , im
-                                             , real
-                                             , mag2
-                                             , magnitude)
-import           Fract.Subdivide            (getLevels)
+import Fract.Complex               (Complex (C)
+                                   , im
+                                   , real
+                                   , mag2
+                                   , magnitude)
 
-type ColorT = (GL.GLfloat, GL.GLfloat, GL.GLfloat)
+type ColorT = (Float, Float, Float)
 type Square = ((Int, Int), Int)
 
 data Preset
@@ -28,10 +21,10 @@ preset :: Preset
 preset = Detail
 
 calc :: Complex -> Complex -> Int -> (Double, Int)
-calc z c mxIter = go 0 z 0
+calc z c maxIter = go 0 z 0
   where
     go i z dz
-        | i >= mxIter || nz > 4 = (de, i)
+        | i >= maxIter || nz > 4 = (de, i)
         | otherwise = go (i + 1) (z * z + c) dz'
       where
         nz = mag2 z
@@ -48,9 +41,9 @@ bailout z =
     q = tx * tx + y * y
 
 escapes :: Int -> Complex -> Bool
-escapes mxIter z = not (bailout z || i >= maxIter)
+escapes maxIter z = not (bailout z || i >= maxIter)
   where
-    (_, i) = calc z z mxIter
+    (_, i) = calc z z maxIter
 
 distance :: Int -> Complex -> Double
 distance mxIter z
@@ -84,20 +77,11 @@ view =
             , voy = 0.00083737688
             , vcutoff = 0.00000005 }
 
-mx :: Int
-mx = 1000
-
-my :: Int
-my = 1000
-
-maxIter :: Int
-maxIter = 7000
-
-toScreen :: Int -> Int -> GL.GLfloat
+toScreen :: Int -> Int -> Float
 toScreen n m = fromIntegral n / (fromIntegral m * 0.5) - 1.0
 
-calcZ :: View -> Int -> Int -> Int -> Int -> Complex
-calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} mx my x y =
+calcZ :: View -> (Int, Int) -> Int -> Int -> Complex
+calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} (mx, my) x y =
     C (go px ox mx x) (go py oy my y)
   where
     go p o m n = i + s * fromIntegral n
@@ -105,80 +89,19 @@ calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} mx my x y =
         i = p - o * 0.5
         s = o / fromIntegral m
 
-calcZ' :: Int -> Int -> Complex
-calcZ' = calcZ view mx my
+calcZ' :: (Int, Int) -> Int -> Int -> Complex
+calcZ' = calcZ view
 
-isInSet :: (Int, Int) -> Bool
-isInSet (x, y) = distance maxIter (calcZ' x y) > vcutoff view
+isInSet :: (Int, Int) -> Int -> (Int, Int) -> Bool
+isInSet m maxIter (x, y) = distance maxIter (calcZ' m x y) > vcutoff view
 
 colorT :: Bool -> ColorT
 colorT inSet
     | inSet = (1, 1, 1)
     | otherwise = (0, 0, 0)
 
-calcSquares :: [Square] -> [(Square, ColorT)]
-calcSquares ss = zip ss ms
-    where ms = map fn ss `using` parListChunk (my `div` 8) rseq
-          fn = colorT . isInSet . fst
-
-drawVertex :: (GL.GLfloat, GL.GLfloat) -> IO ()
-drawVertex (x, y) = GL.vertex $ GL.Vertex3 x y 0
-
-scaleFactor :: Float
-scaleFactor = toScreen ((mx `div` 2) + 1) mx
-
-drawSquare :: (Square, ColorT) -> IO ()
-drawSquare (((x, y), w), (r, g, b)) = do
-    let (x', y', w') = ( toScreen x mx
-                       , toScreen y my
-                       , fromIntegral w * scaleFactor)
-    GL.color $ GL.Color3 r g b
-    mapM_ drawVertex [(x',    y'),
-                      (x'+w', y'),
-                      (x'+w', y'+w'),
-                      (x',    y'+w')]
-
-drawSquares :: [(Square, ColorT)] -> IO ()
-drawSquares = GL.renderPrimitive GL.Quads . mapM_ drawSquare
-
--- type ErrorCallback = Error -> String -> IO ()
-errorCallback :: GLFW.ErrorCallback
-errorCallback _ = hPutStrLn stderr
-
-keyCallback :: GLFW.KeyCallback
-keyCallback window key scancode action _
-    = when ( key == GLFW.Key'Escape && action == GLFW.KeyState'Pressed) $
-        GLFW.setWindowShouldClose window True
-
-bool :: Bool -> a -> a -> a
-bool b falseRes trueRes = if b then trueRes else falseRes
-
-maybe' :: Maybe a -> b -> (a -> b) -> b
-maybe' m nothingRes f = case m of
-    Nothing -> nothingRes
-    Just x  -> f x
-
-
-fractMain :: IO ()
-fractMain = do
-    GLFW.setErrorCallback (Just errorCallback)
-    successfulInit <- GLFW.init
-    -- if init failed, we exit the program
-    let ss = map calcSquares (getLevels (mx, my) 128)
-    bool successfulInit exitFailure $ do
-        mw <- GLFW.createWindow mx my "Mandelbrot" Nothing Nothing
-        maybe' mw (GLFW.terminate >> exitFailure) $ \window -> do
-            GLFW.makeContextCurrent mw
-            GLFW.setKeyCallback window (Just keyCallback)
-            mainLoop ss window
-            GLFW.destroyWindow window
-            GLFW.terminate
-            exitSuccess
-
-mainLoop :: [[(Square, ColorT)]] -> GLFW.Window -> IO ()
-mainLoop ss w = do
-    GL.clear [GL.ColorBuffer]
-    mapM_ drawSquares ss
-    GLFW.swapBuffers w
-    GLFW.pollEvents
-    mainLoop ss w
+calcSquares :: (Int, Int) -> Int -> [Square] -> [(Square, ColorT)]
+calcSquares m@(mx, my) maxIter ss = zip ss ms
+    where ms = map fn ss `using` parListChunk nChunks rseq
+          fn = colorT . isInSet m maxIter . fst
+          nChunks = maximum m `div` 8
