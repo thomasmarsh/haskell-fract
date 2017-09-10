@@ -54,44 +54,40 @@ distance mxIter z
     (nz, _) = calc z mxIter
 
 data View = View
-    { vpx :: Double
-    , vpy :: Double
-    , vox :: Double
-    , voy :: Double
-    , vcutoff :: Double }
+    { vPosition :: Complex
+    , vOffset :: Complex
+    , vCutoff :: Double    -- TODO: determine based on pixel size
+    }
 
 view :: View
 view =
     case preset of
         Top ->
             View
-            { vpx = -0.8
-            , vpy = 0.0
-            , vox = 3.0
-            , voy = 3.0
-            , vcutoff = 0.001 }
+            { vPosition = C (-0.8) 0.0
+            , vOffset   = C 3.0 3.0
+            , vCutoff   = 0.001 }
         Detail ->
             View
-            { vpx = -0.751878166
-            , vpy = -0.034018858
-            , vox = 0.00083737688
-            , voy = 0.00083737688
-            , vcutoff = 0.00000005 }
+            { vPosition = C (-0.751878166) (-0.034018858)
+            , vOffset   = C 0.00083737688 0.00083737688
+            , vCutoff   = 0.00000005 }
 
 calcZ :: View -> (Int, Int) -> (Int, Int) -> Complex
-calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} (mx, my) (x, y) =
-    C (go px ox mx x) (go py oy my y)
+calcZ View { vPosition = C pre pim
+           , vOffset   = C ore oim } (mx, my) (x, y) =
+    C (go pre ore mx x) (go pim oim my y)
   where
-    go p o m n = i + s * fromIntegral n
+    go pos offset m n = i + step * fromIntegral n
       where
-        i = p - o * 0.5
-        s = o / fromIntegral m
+        i = pos - offset * 0.5
+        step = offset / fromIntegral m
 
 calcZ' :: (Int, Int) -> (Int, Int) -> Complex
 calcZ' = calcZ view
 
 isInSet :: (Int, Int) -> Int -> (Int, Int) -> Bool
-isInSet m maxIter z = distance maxIter (calcZ' m z) > vcutoff view
+isInSet m maxIter z = distance maxIter (calcZ' m z) > vCutoff view
 
 colorT :: Bool -> ColorT
 colorT inSet
