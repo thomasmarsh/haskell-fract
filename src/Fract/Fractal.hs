@@ -4,11 +4,17 @@ module Fract.Fractal
 
 import Control.Parallel.Strategies (parListChunk, rseq, using)
 
-import Fract.Complex               (Complex (C)
+import Fract.Complex               ( Complex (C)
                                    , im
                                    , real
                                    , mag2
                                    , magnitude)
+import Fract.State                 ( View (View)
+                                   , view
+                                   , vOffset
+                                   , vPosition
+                                   , vCutoff)
+
 
 type ColorT = (Float, Float, Float)
 type Square = ((Int, Int), Int)
@@ -52,26 +58,6 @@ distance mxIter z
     | otherwise = nz
   where
     (nz, _) = calc z mxIter
-
-data View = View
-    { vPosition :: Complex
-    , vOffset :: Complex
-    , vCutoff :: Double    -- TODO: determine based on pixel size
-    }
-
-view :: View
-view =
-    case preset of
-        Top ->
-            View
-            { vPosition = C (-0.8) 0.0
-            , vOffset   = C 3.0 3.0
-            , vCutoff   = 0.001 }
-        Detail ->
-            View
-            { vPosition = C (-0.751878166) (-0.034018858)
-            , vOffset   = C 0.00083737688 0.00083737688
-            , vCutoff   = 0.00000005 }
 
 calcZ :: View -> (Int, Int) -> (Int, Int) -> Complex
 calcZ View { vPosition = C pre pim
