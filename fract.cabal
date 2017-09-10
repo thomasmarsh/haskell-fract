@@ -22,9 +22,11 @@ library
                      , Fract.Subdivide
   build-depends:       base >= 4.7 && < 5
                      , colour
+                     , exceptions
                      , GLFW-b
                      , OpenGL
                      , parallel
+                     , stm
   default-language:    Haskell2010
   ghc-options:         -Wall
 

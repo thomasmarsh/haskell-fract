@@ -10,21 +10,12 @@ import Fract.Complex               ( Complex (C)
                                    , mag2
                                    , magnitude)
 import Fract.State                 ( View (View)
-                                   , view
                                    , vOffset
                                    , vPosition
                                    , vCutoff)
 
-
 type ColorT = (Float, Float, Float)
 type Square = ((Int, Int), Int)
-
-data Preset
-    = Top
-    | Detail
-
-preset :: Preset
-preset = Detail
 
 calc :: Complex -> Int -> (Double, Int)
 calc c maxIter = go 0 c 0
@@ -69,19 +60,16 @@ calcZ View { vPosition = C pre pim
         i = pos - offset * 0.5
         step = offset / fromIntegral m
 
-calcZ' :: (Int, Int) -> (Int, Int) -> Complex
-calcZ' = calcZ view
-
-isInSet :: (Int, Int) -> Int -> (Int, Int) -> Bool
-isInSet m maxIter z = distance maxIter (calcZ' m z) > vCutoff view
+isInSet :: View -> (Int, Int) -> Int -> (Int, Int) -> Bool
+isInSet v m maxIter z = distance maxIter (calcZ v m z) > vCutoff v
 
 colorT :: Bool -> ColorT
 colorT inSet
     | inSet = (1, 1, 1)
     | otherwise = (0, 0, 0)
 
-calcSquares :: (Int, Int) -> Int -> [Square] -> [(Square, ColorT)]
-calcSquares m maxIter ss = zip ss ms
+calcSquares :: View -> (Int, Int) -> Int -> [Square] -> [(Square, ColorT)]
+calcSquares v m maxIter ss = zip ss ms
     where ms = map fn ss `using` parListChunk nChunks rseq
-          fn = colorT . isInSet m maxIter . fst
+          fn = colorT . isInSet v m maxIter . fst
           nChunks = maximum m `div` 8
