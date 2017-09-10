@@ -4,7 +4,7 @@ module Fract.Subdivide
     , test
     ) where
 
-import Data.Bits ((.&.), shift)
+import Data.Bits ((.&.))
 
 type Coord = (Int, Int)
 
@@ -66,7 +66,6 @@ forest :: Coord -> Int -> Tree
 forest m@(mx, my) w
     | mx < 0 || my < 0 = error "dimensions must be positive"
     | mx < 2 || my < 2 = error "dimensions must be >2"
-    | mx < 2 || my < 2 = error "dimensions must be >2"
     | not (isPow2 w) = error ("w must be a power of 2 (value=" ++ show w ++ ")")
     | otherwise = Node Blank xs
     where xs = map (tree m) (chunks m w')
@@ -119,3 +118,4 @@ test = do
                                          ++ " actual=" ++ show len)
 
     print $ getLevels (1023, 769) 128
+    printTree 0 r

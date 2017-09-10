@@ -21,8 +21,9 @@ toScreen n m = fromIntegral n / (fromIntegral m * 0.5) - 1.0
 drawVertex :: (GL.GLfloat, GL.GLfloat) -> IO ()
 drawVertex (x, y) = GL.vertex $ GL.Vertex3 x y 0
 
+-- TODO: this is a quick hack - replace it.
 scaleFactor :: (Int, Int) -> Float
-scaleFactor (mx, my) = toScreen ((mx `div` 2) + 1) mx
+scaleFactor (mx, _) = toScreen ((mx `div` 2) + 1) mx
 
 drawSquare :: (Int, Int) -> (Square, ColorT) -> IO ()
 drawSquare m@(mx, my) (((x, y), w), (r, g, b)) = do
@@ -43,7 +44,7 @@ errorCallback :: GLFW.ErrorCallback
 errorCallback _ = hPutStrLn stderr
 
 keyCallback :: GLFW.KeyCallback
-keyCallback window key scancode action _
+keyCallback window key _ {- scancode -} action _
     = when ( key == GLFW.Key'Escape && action == GLFW.KeyState'Pressed) $
         GLFW.setWindowShouldClose window True
 
@@ -65,7 +66,7 @@ fractMain = do
     -- if init failed, we exit the program
     let ss = map (calcSquares screenSize maxIter) (getLevels screenSize 128)
     bool successfulInit exitFailure $ do
-        mw <- (uncurry GLFW.createWindow screenSize) "Mandelbrot" Nothing Nothing
+        mw <- uncurry GLFW.createWindow screenSize "Mandelbrot" Nothing Nothing
         maybe' mw (GLFW.terminate >> exitFailure) $ \window -> do
             GLFW.makeContextCurrent mw
             GLFW.setKeyCallback window (Just keyCallback)

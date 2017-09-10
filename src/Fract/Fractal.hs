@@ -20,15 +20,15 @@ data Preset
 preset :: Preset
 preset = Detail
 
-calc :: Complex -> Complex -> Int -> (Double, Int)
-calc z c maxIter = go 0 z 0
+calc :: Complex -> Int -> (Double, Int)
+calc c maxIter = go 0 c 0
   where
     go i z dz
         | i >= maxIter || nz > 4 = (de, i)
         | otherwise = go (i + 1) (z * z + c) dz'
       where
         nz = mag2 z
-        dz' = (C 2.0 0.0) * z * dz + (C 1.0 0.0)
+        dz' = C 2.0 0.0 * z * dz + C 1.0 0.0
         de = nz * log nz / magnitude dz
 
 bailout :: Complex -> Bool
@@ -40,17 +40,18 @@ bailout z =
     tx = x - 0.25
     q = tx * tx + y * y
 
-escapes :: Int -> Complex -> Bool
-escapes maxIter z = not (bailout z || i >= maxIter)
+-- underscore prefixed to hide 'unused' warning
+_escapes :: Int -> Complex -> Bool
+_escapes maxIter z = not (bailout z || i >= maxIter)
   where
-    (_, i) = calc z z maxIter
+    (_, i) = calc z maxIter
 
 distance :: Int -> Complex -> Double
 distance mxIter z
     | bailout z = 0.0
     | otherwise = nz
   where
-    (nz, _) = calc z z mxIter
+    (nz, _) = calc z mxIter
 
 data View = View
     { vpx :: Double
@@ -77,11 +78,8 @@ view =
             , voy = 0.00083737688
             , vcutoff = 0.00000005 }
 
-toScreen :: Int -> Int -> Float
-toScreen n m = fromIntegral n / (fromIntegral m * 0.5) - 1.0
-
-calcZ :: View -> (Int, Int) -> Int -> Int -> Complex
-calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} (mx, my) x y =
+calcZ :: View -> (Int, Int) -> (Int, Int) -> Complex
+calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} (mx, my) (x, y) =
     C (go px ox mx x) (go py oy my y)
   where
     go p o m n = i + s * fromIntegral n
@@ -89,11 +87,11 @@ calcZ View {vpx = px, vpy = py, vox = ox, voy = oy} (mx, my) x y =
         i = p - o * 0.5
         s = o / fromIntegral m
 
-calcZ' :: (Int, Int) -> Int -> Int -> Complex
+calcZ' :: (Int, Int) -> (Int, Int) -> Complex
 calcZ' = calcZ view
 
 isInSet :: (Int, Int) -> Int -> (Int, Int) -> Bool
-isInSet m maxIter (x, y) = distance maxIter (calcZ' m x y) > vcutoff view
+isInSet m maxIter z = distance maxIter (calcZ' m z) > vcutoff view
 
 colorT :: Bool -> ColorT
 colorT inSet
@@ -101,7 +99,7 @@ colorT inSet
     | otherwise = (0, 0, 0)
 
 calcSquares :: (Int, Int) -> Int -> [Square] -> [(Square, ColorT)]
-calcSquares m@(mx, my) maxIter ss = zip ss ms
+calcSquares m maxIter ss = zip ss ms
     where ms = map fn ss `using` parListChunk nChunks rseq
           fn = colorT . isInSet m maxIter . fst
           nChunks = maximum m `div` 8
