@@ -37,7 +37,6 @@ bailout z =
     tx = x - 0.25
     q = tx * tx + y * y
 
--- underscore prefixed to hide 'unused' warning
 _escapes :: Int -> Complex -> Bool
 _escapes maxIter z = not (bailout z || i >= maxIter)
   where

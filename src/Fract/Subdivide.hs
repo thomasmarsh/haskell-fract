@@ -1,7 +1,6 @@
 module Fract.Subdivide
     ( getLevels
     , isPow2
-    , test
     ) where
 
 import Data.Bits ((.&.))
@@ -99,8 +98,8 @@ printTree n (Node Blank xs) = printElem n "<blank>" xs
 getLevels :: Coord -> Int -> [[Square]]
 getLevels m n = filter (not . null) $ levels $ forest m n
 
-test :: IO ()
-test = do
+_test :: IO ()
+_test = do
     let m = (4, 4)
     let w = 128
     let nPoints = uncurry (*) m

@@ -23,9 +23,11 @@ import qualified Graphics.UI.GLFW          as GLFW
 import           Fract.Fractal             (calcSquares)
 import           Fract.Subdivide           (getLevels)
 import           Fract.State               ( AppState
-                                           , StateChange (Quit)
+                                           , StateChange (Quit, NewRenderData)
+                                           , hasRenderData
                                            , initState
                                            , isShutdown
+                                           , stMaxIter
                                            , stView)
 
 type Square = ((Int, Int), Int)
@@ -75,7 +77,6 @@ maybe' m nothingRes f = case m of
 fractMain :: IO ()
 fractMain = do
     let screenSize = (1000, 1000)
-    let maxIter = 7000
 
     GLFW.setErrorCallback (Just errorCallback)
     successfulInit <- GLFW.init
@@ -83,20 +84,17 @@ fractMain = do
     -- if init failed, we exit the program
     bool successfulInit exitFailure $ do
         let app = initState
-        let ss = map (calcSquares (stView app) screenSize maxIter) (getLevels screenSize 128)
+        let ss = map (calcSquares (stView app) screenSize (stMaxIter app)) (getLevels screenSize 128)
         chan <- newTChanIO :: IO (TChan StateChange)
 
         mw <- uncurry GLFW.createWindow screenSize "Mandelbrot" Nothing Nothing
         maybe' mw (GLFW.terminate >> exitFailure) $ \window -> do
             GLFW.makeContextCurrent mw
             GLFW.setKeyCallback window (Just (cbKey chan))
-            (mainLoop app chan screenSize ss window) `finally` 
+            mainLoop app chan screenSize ss window `finally` 
                 ( GLFW.destroyWindow window
                 >> GLFW.terminate
                 >> exitSuccess)
-            -- GLFW.destroyWindow window
-            -- GLFW.terminate
-            -- exitSuccess
 
 mainLoop :: AppState
          -> TChan StateChange
@@ -124,5 +122,6 @@ handleEvents chan app = do
         msg <- atomically $ readTChan chan
         print msg >> hFlush stdout
         handleEvents chan $ case msg of
+            NewRenderData -> app { hasRenderData = True }
             Quit -> app { isShutdown = True }
 
