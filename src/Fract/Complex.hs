@@ -1,7 +1,5 @@
 module Fract.Complex
     ( Complex(..)
-    , real
-    , im
     , mag2
     , magnitude
     ) where
@@ -11,20 +9,14 @@ data Complex = C {-# UNPACK #-} !Double {-# UNPACK #-} !Double
 
 instance Num Complex where
     fromInteger n = C (fromIntegral n) 0.0
-    (C x y) * (C z t) = C (z * x - y * t) (y * z + x * t)
-    (C x y) + (C z t) = C (x + z) (y + t)
-    abs (C x y) = C (sqrt (x * x + y * y)) 0.0
-    signum (C x _) = C (signum x) 0.0
-    negate (C x y) = C (-x) (-y)
-
-real :: Complex -> Double
-real (C x _) = x
-
-im :: Complex -> Double
-im (C _ y) = y
+    (C a b) * (C u v) = C (a*u - b*v) (b*u + a*v)
+    (C a b) + (C u v) = C (a+u) (b+v)
+    abs z = C (magnitude z) 0.0
+    signum (C r _) = C (signum r) 0.0
+    negate (C r i) = C (-r) (-i)
 
 mag2 :: Complex -> Double
-mag2 (C x y) = x * x + y * y
+mag2 (C r i) = r*r + i*i
 
 magnitude :: Complex -> Double
 magnitude = sqrt . mag2

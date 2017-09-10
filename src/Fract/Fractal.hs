@@ -5,8 +5,6 @@ module Fract.Fractal
 import Control.Parallel.Strategies (parListChunk, rseq, using)
 
 import Fract.Complex               ( Complex (C)
-                                   , im
-                                   , real
                                    , mag2
                                    , magnitude)
 import Fract.State                 ( View (View)
@@ -29,13 +27,11 @@ calc c maxIter = go 0 c 0
         de = nz * log nz / magnitude dz
 
 bailout :: Complex -> Bool
-bailout z =
-    (q * (q + tx)) < (0.25 * y * y) || ((x + 1) * (x + 1) + y * y < 0.0625)
+bailout (C re im) =
+    (q * (q + tx)) < (0.25 * im * im) || ((re + 1) * (re + 1) + im * im < 0.0625)
   where
-    x = real z
-    y = im z
-    tx = x - 0.25
-    q = tx * tx + y * y
+    tx = re - 0.25
+    q = tx * tx + im * im
 
 _escapes :: Int -> Complex -> Bool
 _escapes maxIter z = not (bailout z || i >= maxIter)
@@ -64,7 +60,7 @@ isInSet v m maxIter z = distance maxIter (calcZ v m z) > vCutoff v
 
 colorT :: Bool -> ColorT
 colorT inSet
-    | inSet = (1, 1, 1)
+    | inSet = (0.5, 0.7, 1)
     | otherwise = (0, 0, 0)
 
 calcSquares :: View -> (Int, Int) -> Int -> [Square] -> [(Square, ColorT)]
