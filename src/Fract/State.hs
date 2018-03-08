@@ -12,6 +12,7 @@ module Fract.State
     ) where
 
 import Fract.Complex (Complex (C))
+import Fract.Types   (ColorT(..), Square(..))
 
 data Preset
     = Top
@@ -47,10 +48,6 @@ data StateChange
     = NewRenderData
     | Quit
     deriving (Show)
-
--- TODO: dedupe these definitions
-type ColorT = (Float, Float, Float)
-type Square = ((Int, Int), Int)
 
 data AppState = AppState
     { stView :: View

@@ -22,6 +22,10 @@ import qualified Graphics.UI.GLFW          as GLFW
 
 import           Fract.Fractal             (calcSquares)
 import           Fract.Subdivide           (getLevels)
+import           Fract.Types               ( Coord(..)
+                                           , Square(..)
+                                           , ColorT(..)
+                                           , Size(..))
 import           Fract.State               ( AppState
                                            , StateChange (Quit, NewRenderData)
                                            , hasRenderData
@@ -30,9 +34,6 @@ import           Fract.State               ( AppState
                                            , stMaxIter
                                            , stView)
 
-type Square = ((Int, Int), Int)
-type ColorT = (Float, Float, Float)
-
 toScreen :: Int -> Int -> GL.GLfloat
 toScreen n m = fromIntegral n / (fromIntegral m * 0.5) - 1.0
 
@@ -40,11 +41,11 @@ drawVertex :: (GL.GLfloat, GL.GLfloat) -> IO ()
 drawVertex (x, y) = GL.vertex $ GL.Vertex3 x y 0
 
 -- TODO: this is a quick hack - replace it.
-scaleFactor :: (Int, Int) -> Float
-scaleFactor (mx, _) = toScreen ((mx `div` 2) + 1) mx
+scaleFactor :: Size -> Float
+scaleFactor (Size mx _) = toScreen ((mx `div` 2) + 1) mx
 
-drawSquare :: (Int, Int) -> (Square, ColorT) -> IO ()
-drawSquare m@(mx, my) (((x, y), w), (r, g, b)) = do
+drawSquare :: Size -> (Square, ColorT) -> IO ()
+drawSquare m@(Size mx my) (Square (Coord x y) w, ColorT r g b) = do
     let (x', y', w') = ( toScreen x mx
                        , toScreen y my
                        , fromIntegral w * scaleFactor m)
@@ -54,7 +55,7 @@ drawSquare m@(mx, my) (((x, y), w), (r, g, b)) = do
                       (x'+w', y'+w'),
                       (x',    y'+w')]
 
-drawSquares :: (Int, Int) -> [(Square, ColorT)] -> IO ()
+drawSquares :: Size -> [(Square, ColorT)] -> IO ()
 drawSquares m = GL.renderPrimitive GL.Quads . mapM_ (drawSquare m)
 
 -- type ErrorCallback = Error -> String -> IO ()
@@ -76,7 +77,8 @@ maybe' m nothingRes f = case m of
 
 fractMain :: IO ()
 fractMain = do
-    let screenSize = (1000, 1000)
+    let m = (1000, 1000)
+    let screenSize = uncurry Size m
 
     GLFW.setErrorCallback (Just errorCallback)
     successfulInit <- GLFW.init
@@ -87,7 +89,7 @@ fractMain = do
         let ss = map (calcSquares (stView app) screenSize (stMaxIter app)) (getLevels screenSize 128)
         chan <- newTChanIO :: IO (TChan StateChange)
 
-        mw <- uncurry GLFW.createWindow screenSize "Mandelbrot" Nothing Nothing
+        mw <- uncurry GLFW.createWindow m "Mandelbrot" Nothing Nothing
         maybe' mw (GLFW.terminate >> exitFailure) $ \window -> do
             GLFW.makeContextCurrent mw
             GLFW.setKeyCallback window (Just (cbKey chan))
@@ -98,7 +100,7 @@ fractMain = do
 
 mainLoop :: AppState
          -> TChan StateChange
-         -> (Int, Int)
+         -> Size
          -> [[(Square, ColorT)]]
          -> GLFW.Window
          -> IO ()
