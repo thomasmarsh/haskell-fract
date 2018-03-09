@@ -5,7 +5,6 @@ module Fract.Fractal
 import Control.Parallel.Strategies (parListChunk, rseq, using)
 
 import Fract.Complex               ( Complex (C)
-                                   , mag2
                                    , magnitude)
 import Fract.State                 ( View (View)
                                    , vOffset
@@ -19,15 +18,47 @@ import Fract.Types                 ( Coord(..)
 
 data IterPoint = IterPoint Double Int deriving (Show)
 
+data MCalc = MCalc {-# UNPACK #-} !Complex {-# UNPACK #-} !Complex deriving (Show)
+
+-- Abstract out straight squaring so a more optimal function can
+-- replace the multiplication.
+square :: Num a => a -> a
+square x = x*x
+
+-- Provides basic `z = z * c` computation step minimizing multiplies.
+-- This version is efficient for native precision doubles, performing
+-- three multiplies per iteration.
+fastStep :: MCalc -> Complex -> MCalc
+fastStep (MCalc (C zr zi) (C zrsqr zisqr)) (C cr ci)
+    = MCalc (C zr' zi') (C zrsqr' zisqr')
+    where
+        tmp    = zr * zi
+        zr'    = zrsqr - zisqr + cr
+        zi'    = tmp + tmp + ci
+        zrsqr' = square zr'
+        zisqr' = square zi'
+
+-- This version should be used if Double is replaced with a high precision
+-- real number type. At low precision this is inefficent because of an extra
+-- subtraction, but we should see a speedup as the precision increases.
+_fastStepH :: MCalc -> Complex -> MCalc
+_fastStepH (MCalc (C zr zi) (C zrsqr zisqr)) (C cr ci)
+    = MCalc (C zr' zi') (C zrsqr' zisqr')
+    where
+        zr'    = zrsqr - zisqr + cr
+        zi'    = square (zr + zi) - zrsqr - zisqr + ci
+        zrsqr' = square zr'
+        zisqr' = square zi'
+
 calc :: Complex -> Int -> IterPoint
-calc c maxIter = go 0 c 0
+calc c maxIter = go 0 (MCalc (C 0 0) (C 0 0)) 0
   where
-    go i z dz
+    go i z@(MCalc (C zr zi) (C zrsqr zisqr)) dz
         | i >= maxIter || nz > 4 = IterPoint de i
-        | otherwise = go (i + 1) (z * z + c) dz'
+        | otherwise = go (i + 1) (fastStep z c) dz'
       where
-        nz = mag2 z
-        dz' = C 2.0 0.0 * z * dz + C 1.0 0.0
+        nz = zrsqr + zisqr
+        dz' = C (zr+zr) (zi+zi) * dz + C 1.0 0.0
         de = nz * log nz / magnitude dz
 
 bailout :: Complex -> Bool
