@@ -1,11 +1,16 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Fract.Types
-    ( Size(..)
+    ( ColorT(..)
     , Coord(..)
+    , Iter(..)
+    , Size(..)
     , Square(..)
-    , ColorT(..)
     ) where
 
-data Coord  = Coord  Int Int           deriving (Show)
-data Size   = Size   Int Int           deriving (Show)
-data Square = Square Coord Int         deriving (Show)
-data ColorT = ColorT Float Float Float deriving (Show)
+newtype Iter = Iter Int                 deriving (Eq, Show, Enum, Ord)
+
+data ColorT  = ColorT Float Float Float deriving (Show)
+data Coord   = Coord Int Int            deriving (Show)
+data Size    = Size Int Int             deriving (Show)
+data Square  = Square Coord Int         deriving (Show)

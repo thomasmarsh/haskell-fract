@@ -12,7 +12,7 @@ module Fract.State
     ) where
 
 import Fract.Complex (Complex (C))
-import Fract.Types   (ColorT(..), Square(..))
+import Fract.Types   (ColorT(..), Square(..), Iter(..))
 
 data Preset
     = Top
@@ -23,7 +23,7 @@ data View = View
     { vPosition :: Complex
     , vOffset :: Complex
     , vCutoff :: Double    -- TODO: determine based on pixel size
-    , vMaxIter :: Int
+    , vMaxIter :: Iter
     }
 
 view :: Preset -> View
@@ -33,15 +33,15 @@ view preset =
             View
             { vPosition = C (-0.8) 0.0
             , vOffset   = C 3.0 3.0
-            , vCutoff   = 0.001
-            , vMaxIter  = 500
+            , vCutoff   = 0.0007
+            , vMaxIter  = Iter 500
             }
         Detail ->
             View
             { vPosition = C (-0.751878166) (-0.034018858)
             , vOffset   = C 0.00083737688 0.00083737688
             , vCutoff   = 0.00000005
-            , vMaxIter  = 7000
+            , vMaxIter  = Iter 7000
             }
 
 data StateChange
@@ -54,14 +54,18 @@ data AppState = AppState
     , isShutdown :: Bool -- is the app shutting down
     , hasRenderData :: Bool
     , renderBuf :: [[(Square, ColorT)]]
-    , stMaxIter :: Int
+    , stMaxIter :: Iter
     }
+
+initView :: Preset
+initView = Top
+-- initView = Detail
 
 initState :: AppState
 initState = AppState
-    { stView = view Top
+    { stView = view initView
     , isShutdown = False
     , hasRenderData = False
     , renderBuf = []
-    , stMaxIter = vMaxIter (view Top)
+    , stMaxIter = vMaxIter (view initView)
     }

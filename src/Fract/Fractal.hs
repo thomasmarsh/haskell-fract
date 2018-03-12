@@ -4,102 +4,94 @@ module Fract.Fractal
 
 import Control.Parallel.Strategies (parListChunk, rseq, using)
 
-import Fract.Complex               ( Complex (C)
-                                   , magnitude)
+import Fract.Complex               ( Complex (C) )
 import Fract.State                 ( View (View)
                                    , vOffset
-                                   , vPosition
-                                   , vCutoff)
+                                   , vPosition)
 
 import Fract.Types                 ( Coord(..)
                                    , Size(..)
                                    , ColorT(..)
-                                   , Square(..))
+                                   , Square(..)
+                                   , Iter(..))
 
-data IterPoint = IterPoint Double Int deriving (Show)
+data IterProfile = IterProfile
+    {-# UNPACK #-} !Complex  -- z
+    {-# UNPACK #-} !Complex  -- c
+    {-# UNPACK #-} !Iter     -- maxIter
+    {-# UNPACK #-} !Double   -- bailout
 
-data MCalc = MCalc {-# UNPACK #-} !Complex {-# UNPACK #-} !Complex deriving (Show)
+data DemProfile = DemProfile
+    {-# UNPACK #-} !Complex  -- dz
+    {-# UNPACK #-} !Complex  -- z2
+    {-# UNPACK #-} !Double   -- nz
+    {-# UNPACK #-} !Double   -- nzp
 
--- Abstract out straight squaring so a more optimal function can
--- replace the multiplication.
-square :: Num a => a -> a
-square x = x*x
-
--- Provides basic `z = z * c` computation step minimizing multiplies.
--- This version is efficient for native precision doubles, performing
--- three multiplies per iteration.
-fastStep :: MCalc -> Complex -> MCalc
-fastStep (MCalc (C zr zi) (C zrsqr zisqr)) (C cr ci)
-    = MCalc (C zr' zi') (C zrsqr' zisqr')
+dstep :: Iter -> IterProfile -> DemProfile -> (DemProfile, Iter)
+dstep
+    i
+    (IterProfile (C x y) (C a b) maxIter bailout)
+    d@(DemProfile (C dx dy) (C x2 y2) nz nzp)
+    | nzp > 1e40 || nz > bailout || i > maxIter = (d, i)
+    | otherwise =
+        dstep
+            (succ i)
+            (IterProfile (C x' y') (C a b) maxIter bailout)
+            (DemProfile (C dx' dy') (C x2' y2') nz' nzp')
     where
-        tmp    = zr * zi
-        zr'    = zrsqr - zisqr + cr
-        zi'    = tmp + tmp + ci
-        zrsqr' = square zr'
-        zisqr' = square zi'
+        -- Calculate the first derivative
+        dx' = 2 * (x*dx - y*dy) + 1.0
+        dy' = 2 * (x*dy + y*dx)
 
--- This version should be used if Double is replaced with a high precision
--- real number type. At low precision this is inefficent because of an extra
--- subtraction, but we should see a speedup as the precision increases.
-_fastStepH :: MCalc -> Complex -> MCalc
-_fastStepH (MCalc (C zr zi) (C zrsqr zisqr)) (C cr ci)
-    = MCalc (C zr' zi') (C zrsqr' zisqr')
+        -- z = z*z + c
+        x' = x2 - y2 + a
+        y' = 2*x*y + b
+
+        -- abs
+        x2' = x'*x'
+        y2' = y'*y'
+        nz' = x2'+y2'
+        nzp' = dx'*dx' + dy'*dy'
+
+
+newtype Distance = D Int deriving (Eq)
+
+dist :: IterProfile -> Double
+dist it@(IterProfile _ _ maxIter _)
+    | i >= maxIter = 0
+    | nzp < nz = 1
+    | d <= 1.0 = d ** 0.25
+    | nz > escapeRadius = 1
+    | otherwise = 0
     where
-        zr'    = zrsqr - zisqr + cr
-        zi'    = square (zr + zi) - zrsqr - zisqr + ci
-        zrsqr' = square zr'
-        zisqr' = square zi'
+        (DemProfile _ _ nz nzp, i) = dstep (Iter 0) it (DemProfile (C 0 0) (C 0 0) 0 0)
+        d = (4 * sqrt (nz/nzp)*log nz) ** 0.25
 
-calc :: Complex -> Int -> IterPoint
-calc c maxIter = go 0 (MCalc (C 0 0) (C 0 0)) 0
-  where
-    go i z@(MCalc (C zr zi) (C zrsqr zisqr)) dz
-        | i >= maxIter || nz > 4 = IterPoint de i
-        | otherwise = go (i + 1) (fastStep z c) dz'
-      where
-        nz = zrsqr + zisqr
-        dz' = C (zr+zr) (zi+zi) * dz + C 1.0 0.0
-        de = nz * log nz / magnitude dz
+colorD :: Double -> ColorT
+colorD d = ColorT f f f
+    where f | d < 0 = 0
+            | d > 1 = 1
+            | otherwise = realToFrac d
 
-bailout :: Complex -> Bool
-bailout (C re im) =
-    (q * (q + tx)) < (0.25 * im * im) || ((re + 1) * (re + 1) + im * im < 0.0625)
-  where
-    tx = re - 0.25
-    q = tx * tx + im * im
+calcC :: View -> Size -> Coord -> Complex
+calcC View { vPosition = C pre pim
+           , vOffset   = C ore oim } (Size mx my) (Coord x y)
+    = C (go pre ore mx x) (go pim oim my y)
+    where
+        go pos offset m n = i + step * fromIntegral n
+            where
+                i = pos - offset * 0.5
+                step = offset / fromIntegral m
 
-_escapes :: Int -> Complex -> Bool
-_escapes maxIter z = not (bailout z || i >= maxIter)
-  where
-    (IterPoint _ i) = calc z maxIter
+escapeRadius :: Double
+escapeRadius = 33 * 33
 
-distance :: Int -> Complex -> Double
-distance mxIter z
-    | bailout z = 0.0
-    | otherwise = nz
-  where
-    (IterPoint nz _) = calc z mxIter
+calcD :: View -> Size -> Iter -> Coord -> Double
+calcD v m maxIter sz
+    = dist (IterProfile (C 0 0) (calcC v m sz) maxIter escapeRadius)
 
-calcZ :: View -> Size -> Coord -> Complex
-calcZ View { vPosition = C pre pim
-           , vOffset   = C ore oim } (Size mx my) (Coord x y) =
-    C (go pre ore mx x) (go pim oim my y)
-  where
-    go pos offset m n = i + step * fromIntegral n
-      where
-        i = pos - offset * 0.5
-        step = offset / fromIntegral m
-
-isInSet :: View -> Size -> Int -> Coord -> Bool
-isInSet v m maxIter z = distance maxIter (calcZ v m z) > vCutoff v
-
-colorT :: Bool -> ColorT
-colorT inSet
-    | inSet = ColorT 0.5 0.7 1
-    | otherwise = ColorT 0 0 0
-
-calcSquares :: View -> Size -> Int -> [Square] -> [(Square, ColorT)]
+calcSquares :: View -> Size -> Iter -> [Square] -> [(Square, ColorT)]
 calcSquares v m@(Size mx my) maxIter ss = zip ss ms
     where ms = map fn ss `using` parListChunk nChunks rseq
-          fn = colorT . isInSet v m maxIter . (\(Square sz _) -> sz)
+          fn = colorD . calcD v m maxIter . (\(Square sz _) -> sz)
           nChunks = maximum [mx,my] `div` 8
