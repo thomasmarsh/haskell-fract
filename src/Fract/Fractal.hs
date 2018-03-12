@@ -17,27 +17,27 @@ import Fract.Types                 ( Coord(..)
 
 data IterProfile = IterProfile
     {-# UNPACK #-} !Complex  -- z
+    {-# UNPACK #-} !Complex  -- cached x^2 and y^2 from previous iter
     {-# UNPACK #-} !Complex  -- c
     {-# UNPACK #-} !Iter     -- maxIter
     {-# UNPACK #-} !Double   -- bailout
 
 data DemProfile = DemProfile
     {-# UNPACK #-} !Complex  -- dz
-    {-# UNPACK #-} !Complex  -- z2
     {-# UNPACK #-} !Double   -- nz
     {-# UNPACK #-} !Double   -- nzp
 
 dstep :: Iter -> IterProfile -> DemProfile -> (DemProfile, Iter)
 dstep
     i
-    (IterProfile (C x y) (C a b) maxIter bailout)
-    d@(DemProfile (C dx dy) (C x2 y2) nz nzp)
+    (IterProfile (C x y) (C x2 y2) c@(C a b) maxIter bailout)
+    d@(DemProfile (C dx dy) nz nzp)
     | nzp > 1e40 || nz > bailout || i > maxIter = (d, i)
     | otherwise =
         dstep
             (succ i)
-            (IterProfile (C x' y') (C a b) maxIter bailout)
-            (DemProfile (C dx' dy') (C x2' y2') nz' nzp')
+            (IterProfile (C x' y') (C x2' y2') c maxIter bailout)
+            (DemProfile (C dx' dy') nz' nzp')
     where
         -- Calculate the first derivative
         dx' = 2 * (x*dx - y*dy) + 1.0
@@ -47,24 +47,29 @@ dstep
         x' = x2 - y2 + a
         y' = 2*x*y + b
 
-        -- abs
+        -- cache x^2 and y^2 (to be used here and also next iter)
         x2' = x'*x'
         y2' = y'*y'
+
+        -- abs
         nz' = x2'+y2'
         nzp' = dx'*dx' + dy'*dy'
 
 
 newtype Distance = D Int deriving (Eq)
 
+-- Return a distance from the set 0..1.
 dist :: IterProfile -> Double
-dist it@(IterProfile _ _ maxIter _)
-    | i >= maxIter = 0
-    | nzp < nz = 1
-    | d <= 1.0 = d ** 0.25
-    | nz > escapeRadius = 1
-    | otherwise = 0
+dist it@(IterProfile _ _ _ maxIter bailout)
+    | i >= maxIter      = 0  -- not escaping
+    | nz < bailout      = 0  -- not escaping
+    | nzp < nz          = 1  -- escaping through 0
+    | d <= 1.0          = d  -- boundary zone
+    | nz > escapeRadius = 1  -- large distance outside set
+    | otherwise         = 0  -- unreached
     where
-        (DemProfile _ _ nz nzp, i) = dstep (Iter 0) it (DemProfile (C 0 0) (C 0 0) 0 0)
+        (DemProfile _ nz nzp, i) = dstep (Iter 0) it (DemProfile (C 0 0) 0 0)
+        -- TODO: eliminate sqrt here
         d = (4 * sqrt (nz/nzp)*log nz) ** 0.25
 
 colorD :: Double -> ColorT
@@ -88,7 +93,7 @@ escapeRadius = 33 * 33
 
 calcD :: View -> Size -> Iter -> Coord -> Double
 calcD v m maxIter sz
-    = dist (IterProfile (C 0 0) (calcC v m sz) maxIter escapeRadius)
+    = dist (IterProfile (C 0 0) (C 0 0) (calcC v m sz) maxIter escapeRadius)
 
 calcSquares :: View -> Size -> Iter -> [Square] -> [(Square, ColorT)]
 calcSquares v m@(Size mx my) maxIter ss = zip ss ms
